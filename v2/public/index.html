@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UDP Audio Stream Player</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .controls {
+            margin: 20px 0;
+        }
+        #status {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>UDP Audio Stream Player</h1>
+    <div class="controls">
+        <button id="startButton">Start Audio</button>
+        <input type="range" id="volume" min="0" max="2" step="0.1" value="1">
+    </div>
+    <div id="status"></div>
+
+    <script>
+        const startButton = document.getElementById('startButton');
+        const volumeControl = document.getElementById('volume');
+        const status = document.getElementById('status');
+        
+        let audioContext;
+        let gainNode;
+        let scriptNode;
+        let isPlaying = false;
+        let nextPlayTime = 0;
+        const BUFFER_SIZE = 4096; // Taille optimale du buffer
+        const QUEUE_SIZE = 3; // Nombre maximum de chunks en file d'attente
+        let audioQueue = [];
+        let lastProcessedTime = 0;
+
+        // Fonction pour optimiser l'utilisation mémoire
+        function cleanupAudioQueue() {
+            const currentTime = audioContext ? audioContext.currentTime : 0;
+            audioQueue = audioQueue.filter(chunk => chunk.playTime > currentTime);
+        }
+
+        startButton.onclick = async () => {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                    sampleRate: 48000,
+                    latencyHint: 'balanced' // Meilleur équilibre entre latence et performance
+                });
+                gainNode = audioContext.createGain();
+                
+                // Créer un ScriptProcessorNode pour un traitement plus efficace
+                scriptNode = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
+                scriptNode.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+            }
+
+            if (!isPlaying) {
+                const response = await fetch('/audio-stream');
+                const reader = response.body.getReader();
+                
+                isPlaying = true;
+                startButton.textContent = 'Stop Audio';
+                status.textContent = 'Playing audio stream...';
+                nextPlayTime = audioContext.currentTime;
+
+                const processAudioChunk = async () => {
+                    if (!isPlaying) return;
+
+                    // Limiter la fréquence de traitement
+                    const currentTime = performance.now();
+                    if (currentTime - lastProcessedTime < 16) { // ~60fps
+                        requestAnimationFrame(processAudioChunk);
+                        return;
+                    }
+                    lastProcessedTime = currentTime;
+
+                    // // Nettoyer la file d'attente périodiquement
+                    // cleanupAudioQueue();
+
+                    // // Vérifier si la file d'attente n'est pas trop pleine
+                    // if (audioQueue.length >= QUEUE_SIZE) {
+                    //     requestAnimationFrame(processAudioChunk);
+                    //     return;
+                    // }
+
+                    const {value, done} = await reader.read();
+                    if (done) return;
+
+                    // Réutiliser le même buffer pour économiser la mémoire
+                    const samples = Math.floor(value.length / 2);
+                    const audioBuffer = audioContext.createBuffer(1, samples, audioContext.sampleRate);
+                    const channelData = audioBuffer.getChannelData(0);
+                    
+                    // Conversion optimisée PCM16 vers Float32
+                    const view = new DataView(value.buffer);
+                    for (let i = 0; i < samples; i++) {
+                        channelData[i] = view.getInt16(i * 2, true) / 32768.0;
+                    }
+
+                    // Planifier la lecture avec précision
+                    const source = audioContext.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.connect(gainNode);
+
+                    // Gestion précise du timing avec limitation de la latence
+                    const playTime = Math.max(nextPlayTime, audioContext.currentTime + 0.05);
+                    source.start(playTime);
+                    nextPlayTime = playTime + audioBuffer.duration;
+
+                    // Continuer le traitement
+                    requestAnimationFrame(processAudioChunk);
+                };
+
+                processAudioChunk();
+            } else {
+                isPlaying = false;
+                startButton.textContent = 'Start Audio';
+                status.textContent = 'Audio stream stopped';
+                audioQueue = [];
+            }
+        };
+
+        volumeControl.oninput = (e) => {
+            if (gainNode) {
+                gainNode.gain.value = e.target.value;
+            }
+        };
+
+        volumeControl.oninput = (e) => {
+            if (gainNode) {
+                gainNode.gain.value = e.target.value;
+            }
+        };
+    </script>
+</body>
+</html>

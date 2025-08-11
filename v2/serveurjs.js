@@ -59,7 +59,6 @@ udpServer.on('message', (msg) => {
   // Play audio locally through speaker
   //speaker.write(msg);
 
-  //console.log(msg);
   // Send to all active HTTP streams
   activeStreams.forEach(stream => {
     try {
