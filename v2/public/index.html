@@ -4,12 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Radio AAVO</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         body {
             font-family: Arial, sans-serif;
             max-width: 800px;
             margin: 0 auto;
             padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
         }
         .controls {
             margin: 20px 0;
@@ -19,19 +24,29 @@
             padding: 10px;
             border-radius: 4px;
         }
+        #startButton {
+            background: none;
+            border: none;
+            font-size: 2em;
+            cursor: pointer;
+            color: #333;
+            padding: 10px;
+            outline: none;
+        }
+        #startButton:hover {
+            color: #666;
+        }
     </style>
 </head>
 <body>
-    <h1>Radio AAVO Player</h1>
+    <h1>Radio Player</h1>
     <div class="controls">
-        <button id="startButton">Ecouter</button>
-        <input type="range" id="volume" min="0" max="2" step="0.1" value="1">
+        <button id="startButton"><i class="fas fa-play"></i></button>
     </div>
     <div id="status"></div>
 
     <script>
         const startButton = document.getElementById('startButton');
-        const volumeControl = document.getElementById('volume');
         const status = document.getElementById('status');
         
         let audioContext;
@@ -43,6 +58,28 @@
         const QUEUE_SIZE = 3; // Nombre maximum de chunks en file d'attente
         let audioQueue = [];
         let lastProcessedTime = 0;
+
+        // Function to stop playback
+        function stopPlayback() {
+            if (isPlaying) {
+                isPlaying = false;
+                startButton.innerHTML = '<i class="fas fa-play"></i>';
+                status.textContent = "Arret de l'écoute";
+                audioQueue = [];
+            }
+        }
+
+        // Handle visibility change
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                stopPlayback();
+            }
+        });
+
+        // Handle before unload
+        window.addEventListener('beforeunload', () => {
+            stopPlayback();
+        });
 
         // Fonction pour optimiser l'utilisation mémoire
         function cleanupAudioQueue() {
@@ -57,6 +94,7 @@
                     latencyHint: 'balanced' // Meilleur équilibre entre latence et performance
                 });
                 gainNode = audioContext.createGain();
+                gainNode.gain.value = 1.0; // Static gain value
                 
                 // Créer un ScriptProcessorNode pour un traitement plus efficace
                 scriptNode = audioContext.createScriptProcessor(BUFFER_SIZE, 1, 1);
@@ -69,7 +107,7 @@
                 const reader = response.body.getReader();
                 
                 isPlaying = true;
-                startButton.textContent = 'Stop';
+                startButton.innerHTML = '<i class="fas fa-stop"></i>';
                 status.textContent = 'Ecoute en cours...';
                 nextPlayTime = audioContext.currentTime;
 
@@ -124,21 +162,9 @@
                 processAudioChunk();
             } else {
                 isPlaying = false;
-                startButton.textContent = 'Ecouter';
+                startButton.innerHTML = '<i class="fas fa-play"></i>';
                 status.textContent = "Arret de l'écoute";
                 audioQueue = [];
-            }
-        };
-
-        volumeControl.oninput = (e) => {
-            if (gainNode) {
-                gainNode.gain.value = e.target.value;
-            }
-        };
-
-        volumeControl.oninput = (e) => {
-            if (gainNode) {
-                gainNode.gain.value = e.target.value;
             }
         };
     </script>
