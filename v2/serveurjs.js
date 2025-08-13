@@ -1,5 +1,4 @@
 const dgram = require('dgram');
-const Speaker = require('speaker');
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -37,28 +36,10 @@ app.get('/audio-stream', (req, res) => {
 // Keep track of all active HTTP streams
 const activeStreams = [];
 
-// Setup the speaker to play raw PCM16 16kHz mono audio locally
-const speaker = new Speaker({
-  channels: 1,
-  bitDepth: 16,
-  sampleRate: 48000,
-  signed: true,
-  float: false,
-  endian: 'little',
-});
-
-speaker.on('error', (err) => {
-  console.error('Speaker error:', err);
-});
-
 // Setup UDP socket to receive raw PCM16 audio from source
 const udpServer = dgram.createSocket('udp4');
 
-
 udpServer.on('message', (msg) => {
-  // Play audio locally through speaker
-  //speaker.write(msg);
-
   // Send to all active HTTP streams
   activeStreams.forEach(stream => {
     try {
@@ -80,5 +61,5 @@ udpServer.bind(UDP_PORT, UDP_HOST, () => {
 
 // Start HTTP server
 server.listen(HTTP_PORT, () => {
-  console.log(`HTTP server started on http://localhost:${HTTP_PORT}`);
+  console.log(`HTTP server started on http://127.0.0.1:${HTTP_PORT}`);
 });
