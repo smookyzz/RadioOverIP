@@ -40,14 +40,17 @@ const activeStreams = [];
 const udpServer = dgram.createSocket('udp4');
 
 udpServer.on('message', (msg) => {
-  // Send to all active HTTP streams
-  activeStreams.forEach(stream => {
-    try {
-      stream.write(msg);
-    } catch (err) {
-      console.error('Error writing to stream:', err);
-    }
-  });
+
+  if (msg[0] !== 0) {
+    // Send to all active HTTP streams
+    activeStreams.forEach(stream => {
+      try {
+        stream.write(msg);
+      } catch (err) {
+        console.error('Error writing to stream:', err);
+      }
+    });
+  }
 });
 
 udpServer.on('error', (err) => {
